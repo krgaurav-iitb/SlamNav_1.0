@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".sensorData"
+    tools:layout_editor_absoluteY="81dp">
+
+    <TableLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/sensorValuesTable"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:paddingBottom="5dp"
+            android:paddingTop="5dp">
+
+            <TextView
+                android:layout_width="192dp"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:text="X Position"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textSize="18sp"
+                tools:textAlignment="center" />
+
+            <TextView
+                android:id="@+id/xPosition"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="Decimal"
+                android:inputType="numberDecimal"
+                android:text="0"
+                android:textAlignment="center"
+                android:textSize="18sp" />
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:paddingBottom="5dp"
+            android:paddingTop="5dp">
+
+            <TextView
+                android:layout_width="192dp"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:text="Y Position"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textSize="18sp"
+                tools:textAlignment="center" />
+
+            <TextView
+                android:id="@+id/yPosition"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="Decimal"
+                android:inputType="numberDecimal"
+                android:text="0"
+                android:textAlignment="center"
+                android:textSize="18sp" />
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:paddingBottom="5dp"
+            android:paddingTop="5dp">
+
+            <TextView
+                android:layout_width="192dp"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:text="Z Position"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textSize="18sp"
+                tools:textAlignment="center" />
+
+            <TextView
+                android:id="@+id/zPosition"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="Decimal"
+                android:inputType="numberDecimal"
+                android:text="0"
+                android:textAlignment="center"
+                android:textSize="18sp" />
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:paddingBottom="5dp"
+            android:paddingTop="5dp">
+
+            <TextView
+                android:layout_width="192dp"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:text="X Acceleration"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textSize="18sp"
+                tools:textAlignment="center" />
+
+            <TextView
+                android:id="@+id/xAcceleration"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="Decimal"
+                android:inputType="numberDecimal"
+                android:text="0"
+                android:textAlignment="center"
+                android:textSize="18sp" />
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:paddingBottom="5dp"
+            android:paddingTop="5dp">
+
+            <TextView
+                android:layout_width="192dp"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:text="Y Acceleration"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textSize="18sp"
+                tools:textAlignment="center" />
+
+            <TextView
+                android:id="@+id/yAcceleration"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="Decimal"
+                android:inputType="numberDecimal"
+                android:text="0"
+                android:textAlignment="center"
+                android:textSize="18sp" />
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:paddingBottom="5dp"
+            android:paddingTop="5dp">
+
+            <TextView
+                android:layout_width="192dp"
+                android:layout_height="wrap_content"
+                android:layout_column="1"
+                android:text="Z Acceleration"
+                android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+                android:textSize="18sp"
+                tools:textAlignment="center" />
+
+            <TextView
+                android:id="@+id/zAcceleration"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:contentDescription="Decimal"
+                android:inputType="numberDecimal"
+                android:text="0"
+                android:textAlignment="center"
+                android:textSize="18sp" />
+
+        </TableRow>
+
+    </TableLayout>
+    <!--
+    <com.jjoe64.graphview.helper.GraphViewXML
+        android:id="@+id/graphViewXAcceleration"
+        android:layout_width="match_parent"
+        android:layout_height="100dip"
+        app:seriesType="line"
+        app:seriesColor="#ee0000" />
+    -->
+    <ListView
+        android:id="@+id/sensorList"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+
+</android.support.constraint.ConstraintLayout>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:id="@+id/linearLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginBottom="8dp"
+            android:layout_marginEnd="6dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical"
+            android:visibility="visible">
+
+            <Button
+                android:id="@+id/calibration"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:onClick="launchCalibration"
+                android:text="Calibration" />
+
+            <Button
+                android:id="@+id/sensorCalibration"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:background="@color/colorTabs"
+                android:onClick="launchSensorCalibration"
+                android:text="Sensor Calibration" />
+
+            <Button
+                android:id="@+id/markerDetection"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:onClick="launchMarkerDetectionActivity"
+                android:text="Marker Detection" />
+
+            <Button
+                android:id="@+id/sensorData"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:background="@color/colorTabs"
+                android:onClick="launchSensorActivity"
+                android:text="Sensor Data" />
+
+            <Button
+                android:id="@+id/slam"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:text="slam"
+                android:onClick="launchBasicSlamActivity"/>
+        </LinearLayout>
+    </ScrollView>
+
+</android.support.constraint.ConstraintLayout>
