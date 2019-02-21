@@ -33,6 +33,7 @@ public class slamMapTabFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_basic_slam_tab_map, container, false);
         ImageView iv = (ImageView) rootView.findViewById(R.id.imageView);
+
         // programmatically create a LineChart
         //LineChart chart = (LineChart)getView().findViewById(R.id.chart);
         //ScatterChart scatterChart = (ScatterChart) rootView.findViewById(R.id.chart1);
@@ -95,6 +96,8 @@ public class slamMapTabFragment extends Fragment {
 
         iv.setImageBitmap(bm);
         //Imgcodecs.imwrite("e:/test.png", mplot);
+
+
 
 
         return rootView;//
