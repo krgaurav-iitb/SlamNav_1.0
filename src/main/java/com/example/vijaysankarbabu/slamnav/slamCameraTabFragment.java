@@ -41,6 +41,7 @@ import java.lang.reflect.Array;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +65,8 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
     Mat mrgba, mOutput;
 
     public static Map<Integer, float[]> landmarkPoints;
+    public static Map<Integer, float[]> cameraPoints= null;
+    int countcamera=0;
     private boolean camTrackInitFlag = false;
     private int camTrackInitCount[] = null;
     public static String CoordinateDump="";
@@ -104,6 +107,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
         //initialising variables
         landmarkPoints = basicSlam.knownLandmarkPoints;
+        cameraPoints= new HashMap<>();
         camTrackInitCount = new int[MAX_MARKER_ID]; //MAX_MARKER_ID refers to number of markers used, we need a count for each marker;
         camTrackInitFlag = false;
 
@@ -279,7 +283,12 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         }
         Core.divide(result, Scalar.all(len), result);
         //result1 = result;
-
+        float[] cameraCoord = new float[3];
+        cameraCoord[0] = (float) result.get(0, 0)[0];
+        cameraCoord[1] = (float) result.get(1, 0)[0];
+        cameraCoord[2] = (float) result.get(2, 0)[0];
+        cameraPoints.put(countcamera, cameraCoord);
+        countcamera++;
 
         double[] a = new double[3];
         result.get(0, 0, a);//I get byte array here for the whole image
@@ -529,17 +538,70 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
                 // TODO: 28-06-2018 complete this
                 if (coordinates.empty() || mDistortionCoefficients.empty() || rvecs.empty() || corners.get(i).empty() || mCameraMatrix.empty())
                     break;
-                findNewMarkerCoordinates(id, coordinates, rvecs.row(0), corners.get(i), mCameraMatrix, mDistortionCoefficients);
+                findNewMarkerCoordinates(id, coordinates, rvecs.row(0),tvecs.row(0), corners.get(i), mCameraMatrix, mDistortionCoefficients);
             }
         }
     }
 
-    private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
+    private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c,Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
         Mat rvec = new Mat();
+        Mat tvec = new Mat();
         Mat.zeros(3, 1, CvType.CV_64F);
         Mat result = new Mat();
         Mat.zeros(3, 1, CvType.CV_64F).copyTo(result);
         Mat rotMatrix = new Mat();
+        Mat tempResult = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(rvec);
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(tvec);
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(tempResult);
+        rvec.put(0, 0, rvec3c.get(0, 0)[0]);
+        rvec.put(1, 0, rvec3c.get(0, 0)[1]);
+        rvec.put(2, 0, rvec3c.get(0, 0)[2]);
+
+        tvec.put(0, 0, tvec3c.get(0, 0)[0]);
+        tvec.put(1, 0, tvec3c.get(0, 0)[1]);
+        tvec.put(2, 0, tvec3c.get(0, 0)[2]);
+        Mat newMarkerPoint = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(newMarkerPoint);
+        newMarkerPoint.put(0, 0, corner.get(0, 0)[0]);
+        newMarkerPoint.put(1, 0, corner.get(0, 0)[1]);
+        newMarkerPoint.put(2, 0, 1);
+        //Camera coordinates can be obtained using 'camera position = - rot_matrix.transpose() * tvec'
+        //Here rotation matrix can be obtained by Rodrigues function
+        Log.i(TAG, "findNewMarkerCoordinates: corners" + corner.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: marker 2D point" + Integer.toString(id) + newMarkerPoint.dump());
+        Calib3d.Rodrigues(rvec, rotMatrix);
+        rotMatrix = rotMatrix.inv();
+        Log.i(TAG, "Camera matrix1: " + mCameraMatrix.dump());
+        mCameraMatrix = mCameraMatrix.inv();
+        Log.i(TAG, "Camera matrix2: " + mCameraMatrix.dump());
+        Core.gemm(mCameraMatrix, newMarkerPoint, 1, newMarkerPoint, 0, newMarkerPoint, 0);
+        Core.subtract(newMarkerPoint,tvec,tempResult);
+        tempResult.copyTo(newMarkerPoint);
+        Log.i(TAG, "findNewMarkerCoordinates: first Mult" + newMarkerPoint.dump());
+        Core.gemm(rotMatrix, newMarkerPoint, 1, camCoord, 0, result, 0);
+        //result.put(2, 0,result.get(2, 0)[0]-camCoord.get(2, 0)[0]);
+        Log.i(TAG, "findNewMarkerCoordinates: result" + result.dump());
+        float[] landmarkCoord = new float[3];
+        landmarkCoord[0] = (float) result.get(0, 0)[0];
+        landmarkCoord[1] = (float) result.get(1, 0)[0];
+        landmarkCoord[2] = (float) result.get(2, 0)[0];
+
+        double[] a2 = new double[3];
+        result.get(0, 0, a2);//I get byte array here for the whole image
+        basicSlam.landmarkDump+= "\n"+String.format("%.2f",a2[0])+","+String.format("%.2f",a2[1])+","+String.format("%.2f",a2[2]);
+        //basicSlam.landmarkDump+= Float.toString(landmarkCoord[0])+","+Float.toString(landmarkCoord[1])+","+Float.toString(landmarkCoord[2])+"\n";
+
+
+        landmarkPoints.put(id, landmarkCoord);
+    }
+
+   /* private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c, Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
+        Mat rvec = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F);
+        Mat result = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(result);
+        Mat rotMatrix1 = new Mat();
         Mat tempResult = new Mat();
         Mat.zeros(3, 1, CvType.CV_64F).copyTo(rvec);
         Mat.zeros(3, 1, CvType.CV_64F).copyTo(tempResult);
@@ -555,13 +617,18 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         //Here rotation matrix can be obtained by Rodrigues function
         Log.i(TAG, "findNewMarkerCoordinates: corners" + corner.dump());
         Log.i(TAG, "findNewMarkerCoordinates: marker 2D point" + Integer.toString(id) + newMarkerPoint.dump());
-        Calib3d.Rodrigues(rvec, rotMatrix);
-        rotMatrix = rotMatrix.inv();
-        mCameraMatrix = mCameraMatrix.inv();
-
-        Core.gemm(mCameraMatrix, newMarkerPoint, 1, newMarkerPoint, 0, newMarkerPoint, 0);
-        Log.i(TAG, "findNewMarkerCoordinates: first Mult" + newMarkerPoint.dump());
-        Core.gemm(rotMatrix, newMarkerPoint, 1, camCoord, 1, result, 0);
+        Calib3d.Rodrigues(rvec, rotMatrix1);
+        //rotMatrix = rotMatrix.inv();
+        rotMatrix1.put(0, 2, tvec3c.get(0, 0)[0]);
+        rotMatrix1.put(1, 2, tvec3c.get(0, 0)[1]);
+        rotMatrix1.put(2, 2, tvec3c.get(0, 0)[2]);
+        Log.i(TAG, "H matrix: " + rotMatrix1.dump());
+        //mCameraMatrix = mCameraMatrix.inv();
+        Log.i(TAG, "Camera matrix: " + mCameraMatrix.dump());
+        Core.gemm(mCameraMatrix, rotMatrix1, 1, newMarkerPoint, 0, rotMatrix1, 0);
+        Log.i(TAG, "findNewMarkerCoordinates: first Mult" + rotMatrix1.dump());
+        Core.gemm(rotMatrix1, newMarkerPoint, 1, camCoord, 0, result, 0);
+        //result.put(2, 0,result.get(2, 0)[0]-camCoord.get(2, 0)[0]);
         Log.i(TAG, "findNewMarkerCoordinates: result" + result.dump());
         float[] landmarkCoord = new float[3];
         landmarkCoord[0] = (float) result.get(0, 0)[0];
@@ -575,7 +642,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
 
         landmarkPoints.put(id, landmarkCoord);
-    }
+    }*/
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
@@ -596,7 +663,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
                     //Aruco.estimatePoseSingleMarkers(corners, 6.3f, mCameraMatrix, mDistortionCoefficients, rvecs, tvecs);
                     //Log.i(TAG, "findPoseSingleMarker: rvecs real" +rvecs.dump());
                     //Log.i(TAG, "findPoseSingleMarker: tvecs real" +tvecs.dump());
-                    findPoseSingleMarker(corners, ids, 6.3f, mCameraMatrix, mDistortionCoefficients, rvecs, tvecs);
+                    findPoseSingleMarker(corners, ids, 9.1f, mCameraMatrix, mDistortionCoefficients, rvecs, tvecs);
                     //Aruco.drawAxis(inputFrame.rgba(), mCameraMatrix, mDistortionCoefficients, rvecs, tvecs, 0.1f);
                     //Mat coordinates = getCameraCoordinates(ids, rvecs, tvecs);
                 }

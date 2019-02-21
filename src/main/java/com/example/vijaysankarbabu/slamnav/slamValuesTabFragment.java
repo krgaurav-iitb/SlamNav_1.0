@@ -31,7 +31,7 @@ public class slamValuesTabFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_basic_slam_tab_values, container, false);
         TextView tv = view.findViewById(R.id.textViewValuesFragment);
-        Map<Integer,float[]> mp= null;
+    /*    Map<Integer,float[]> mp= null;
         //mp = basicSlam.knownLandmarkPoints;
         Log.i(TAG, "mapping mat "  +Integer.toString(slamCameraTabFragment.landmarkPoints.size()));
         mp=slamCameraTabFragment.landmarkPoints;
@@ -58,8 +58,10 @@ public class slamValuesTabFragment extends Fragment {
             Log.i(TAG, "onCreateView: landmarkdump value added");
         }*/
 
-        Log.i(TAG, "onCreateView: landmarks received "+landmarkDump);
+        /*Log.i(TAG, "onCreateView: landmarks received "+landmarkDump);
         tv.setText(landmarkDump);
+        tv.setText("Camera Coordinate");*/
+        tv.setText(slamCameraTabFragment.CoordinateDump);
         return view;
     }
     @Override

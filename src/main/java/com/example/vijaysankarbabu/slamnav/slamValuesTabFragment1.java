@@ -60,6 +60,7 @@ public class slamValuesTabFragment1 extends Fragment {
 
         Log.i(TAG, "onCreateView: landmarks received "+landmarkDump);
         tv.setText(landmarkDump);
+
         return view;
     }
     @Override
