@@ -52,6 +52,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
     private static final String TAG = "slamCameraFragment";
     private static final int CAM_INIT_COUNT = 5;
     private static final int MAX_MARKER_ID = 40;
+    private  float z_fixed;
     private static final boolean MISMATCH_LANDMARK = false; // set it to true to enable mixpoints
 
     JavaCameraView camSlam;
@@ -426,6 +427,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] - (a / 2), worldCoord[2])));
         cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] - (a / 2), worldCoord[2])));
         Log.i(TAG, "findMarkerCorner: cornerworldpoints" + cornerWorldPoints.dump());
+        z_fixed=worldCoord[2];
     }
 
     public void findPoseSingleMarker(List<Mat> corners, Mat ids, float length, Mat mCameraMatrix, Mat mDistortionCoefficients, Mat rvecs, Mat tvecs) {
@@ -543,7 +545,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         }
     }
 
-    private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c,Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
+    /**private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c,Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
         Mat rvec = new Mat();
         Mat tvec = new Mat();
         Mat.zeros(3, 1, CvType.CV_64F);
@@ -585,7 +587,8 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         float[] landmarkCoord = new float[3];
         landmarkCoord[0] = (float) result.get(0, 0)[0];
         landmarkCoord[1] = (float) result.get(1, 0)[0];
-        landmarkCoord[2] = (float) result.get(2, 0)[0];
+        //landmarkCoord[2] = (float) result.get(2, 0)[0];
+        landmarkCoord[2] = z_fixed;
 
         double[] a2 = new double[3];
         result.get(0, 0, a2);//I get byte array here for the whole image
@@ -594,9 +597,9 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
 
         landmarkPoints.put(id, landmarkCoord);
-    }
+    }*/
 
-   /* private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c, Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
+    private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c, Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
         Mat rvec = new Mat();
         Mat.zeros(3, 1, CvType.CV_64F);
         Mat result = new Mat();
@@ -623,17 +626,19 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         rotMatrix1.put(1, 2, tvec3c.get(0, 0)[1]);
         rotMatrix1.put(2, 2, tvec3c.get(0, 0)[2]);
         Log.i(TAG, "H matrix: " + rotMatrix1.dump());
-        //mCameraMatrix = mCameraMatrix.inv();
+        mCameraMatrix = mCameraMatrix.inv();
+        rotMatrix1 = rotMatrix1.inv();
         Log.i(TAG, "Camera matrix: " + mCameraMatrix.dump());
-        Core.gemm(mCameraMatrix, rotMatrix1, 1, newMarkerPoint, 0, rotMatrix1, 0);
+        Core.gemm( rotMatrix1,mCameraMatrix, 1, newMarkerPoint, 0, rotMatrix1, 0);
         Log.i(TAG, "findNewMarkerCoordinates: first Mult" + rotMatrix1.dump());
         Core.gemm(rotMatrix1, newMarkerPoint, 1, camCoord, 0, result, 0);
         //result.put(2, 0,result.get(2, 0)[0]-camCoord.get(2, 0)[0]);
+        
         Log.i(TAG, "findNewMarkerCoordinates: result" + result.dump());
         float[] landmarkCoord = new float[3];
-        landmarkCoord[0] = (float) result.get(0, 0)[0];
-        landmarkCoord[1] = (float) result.get(1, 0)[0];
-        landmarkCoord[2] = (float) result.get(2, 0)[0];
+        landmarkCoord[0] = (float) (result.get(0, 0)[0]/result.get(2, 0)[0]);
+        landmarkCoord[1] = (float) (result.get(1, 0)[0]/result.get(2, 0)[0]);
+        landmarkCoord[2] = z_fixed;
 
         double[] a2 = new double[3];
         result.get(0, 0, a2);//I get byte array here for the whole image
@@ -642,7 +647,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
 
         landmarkPoints.put(id, landmarkCoord);
-    }*/
+    }
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
