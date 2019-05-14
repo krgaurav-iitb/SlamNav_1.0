@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.opencv.calib3d.Calib3d.CV_P3P;
 import static org.opencv.core.CvType.CV_64FC;
 import static org.opencv.core.CvType.CV_64FC3;
 
@@ -52,7 +53,11 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
     private static final String TAG = "slamCameraFragment";
     private static final int CAM_INIT_COUNT = 5;
     private static final int MAX_MARKER_ID = 40;
+    private final Size mImageSize = new Size(1280 , 720);
+    private  float x_fixed;
+    private  float y_fixed;
     private  float z_fixed;
+    public  int count=0;
     private static final boolean MISMATCH_LANDMARK = false; // set it to true to enable mixpoints
 
     JavaCameraView camSlam;
@@ -66,11 +71,20 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
     Mat mrgba, mOutput;
 
     public static Map<Integer, float[]> landmarkPoints;
+    public static Map<Integer, float[]> setLandmarkPoints;
+
+    public static Map<Integer, Integer> setCount= null;
+    int setLandmarkPointsCount=0;
     public static Map<Integer, float[]> cameraPoints= null;
     int countcamera=0;
     private boolean camTrackInitFlag = false;
     private int camTrackInitCount[] = null;
     public static String CoordinateDump="";
+
+    MatOfPoint2f imagepointsF0 = new MatOfPoint2f();
+    MatOfPoint2f imagepointsTemp = new MatOfPoint2f();
+    Mat rvecs_frame0 = new Mat();
+    Mat tvecs_frame0 = new Mat();
 
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(getActivity()) {
@@ -108,7 +122,10 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
         //initialising variables
         landmarkPoints = basicSlam.knownLandmarkPoints;
+        setLandmarkPoints=new HashMap<>(basicSlam.knownLandmarkPoints);
+        //Log.i(TAG, "oncreate: setLandmarkPoints" + setLandmarkPoints.toString());
         cameraPoints= new HashMap<>();
+        setCount=new HashMap<>();
         camTrackInitCount = new int[MAX_MARKER_ID]; //MAX_MARKER_ID refers to number of markers used, we need a count for each marker;
         camTrackInitFlag = false;
 
@@ -258,6 +275,8 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         Mat.zeros(3, 1, CvType.CV_64F).copyTo(result);
         Mat rotMatrix = new Mat();
         Mat rvec = new Mat();
+        Mat cameraCoord=new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(cameraCoord);
         Mat tvec = new Mat();
         Mat tempResult = new Mat();
         Mat.zeros(3, 1, CvType.CV_64F).copyTo(rvec);
@@ -284,21 +303,38 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         }
         Core.divide(result, Scalar.all(len), result);
         //result1 = result;
-        float[] cameraCoord = new float[3];
-        cameraCoord[0] = (float) result.get(0, 0)[0];
-        cameraCoord[1] = (float) result.get(1, 0)[0];
-        cameraCoord[2] = (float) result.get(2, 0)[0];
-        cameraPoints.put(countcamera, cameraCoord);
+        //float[] cameraCoord = new float[3];
+        /*cameraCoord.put(0,0,result.get(0, 0)[0]);
+        cameraCoord.put(0,0,result.get(1, 0)[0]);
+        cameraCoord.put(0,0,result.get(2, 0)[0]);*/
+        //cameraPoints.put(countcamera, cameraCoord);
+        //countcamera++;
+        if(setLandmarkPointsCount==1)
+        {
+            cameraCoord.put(0,0,result.get(0, 0)[0]);
+            cameraCoord.put(1,0,result.get(1, 0)[0]);
+            cameraCoord.put(2,0,result.get(2, 0)[0]);
+        }
+        if(setLandmarkPointsCount==2)
+        {
+            cameraCoord.put(0,0,x_fixed-result.get(2, 0)[0]);
+            cameraCoord.put(1,0,result.get(1, 0)[0]);
+            cameraCoord.put(2,0,result.get(0, 0)[0]);
+        }
+        float[] cameraCoord1 = new float[3];
+        cameraCoord1[0] = (float) cameraCoord.get(0, 0)[0];
+        cameraCoord1[1] = (float) cameraCoord.get(1, 0)[0];
+        cameraCoord1[2] = (float) cameraCoord.get(2, 0)[0];
+        cameraPoints.put(countcamera, cameraCoord1);
         countcamera++;
-
         double[] a = new double[3];
-        result.get(0, 0, a);//I get byte array here for the whole image
+        cameraCoord.get(0, 0, a);//I get byte array here for the whole image
         CoordinateDump+= "\n"+String.format("%.2f",a[0])+","+String.format("%.2f",a[1])+","+String.format("%.2f",a[2]);
 
         //File file = new File("/storage/emulated/0/Download/myfile.txt");
         //printtoTextFile(result, file);
-        System.out.println("camera coordinates " + result);
-        return result;
+        //System.out.println("camera coordinates " + result);
+        return cameraCoord;
     }
 
     /**
@@ -422,16 +458,162 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
     public void findMarkerCorner(int id, float a, MatOfPoint3f cornerWorldPoints) {
         float[] worldCoord = landmarkPoints.get(id);
-        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] + (a / 2), worldCoord[2])));
-        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] + (a / 2), worldCoord[2])));
-        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] - (a / 2), worldCoord[2])));
-        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] - (a / 2), worldCoord[2])));
+        if(setLandmarkPointsCount==1)
+        {
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] + (a / 2), 0)));
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] + (a / 2), 0)));
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] - (a / 2), 0)));
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] - (a / 2), 0)));
+        }
+        if(setLandmarkPointsCount==2)
+        {
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[2] - (a / 2), worldCoord[1] + (a / 2), 0)));
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[2] + (a / 2), worldCoord[1] + (a / 2), 0)));
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[2] + (a / 2), worldCoord[1] - (a / 2), 0)));
+            cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[2] - (a / 2), worldCoord[1] - (a / 2), 0)));
+        }
+        /*cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] + (a / 2), 0)));
+        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] + (a / 2), 0)));
+        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] + (a / 2), worldCoord[1] - (a / 2), 0)));
+        cornerWorldPoints.push_back(new MatOfPoint3f(new Point3(worldCoord[0] - (a / 2), worldCoord[1] - (a / 2), 0)));*/
         Log.i(TAG, "findMarkerCorner: cornerworldpoints" + cornerWorldPoints.dump());
+        x_fixed=worldCoord[0];
+        y_fixed=worldCoord[1];
         z_fixed=worldCoord[2];
     }
-
     public void findPoseSingleMarker(List<Mat> corners, Mat ids, float length, Mat mCameraMatrix, Mat mDistortionCoefficients, Mat rvecs, Mat tvecs) {
         int knownLandmarkCount = 0;
+        for (int i = 0; i < ids.size().height; i++) {
+            int id = (int) ids.get(i, 0)[0];
+            if (landmarkPoints.get(id) != null) { //if known marker found and mismatch is false
+                //finding the world coordinaates of known marker corners
+                if (setLandmarkPoints.get(id) != null)
+                {   Log.i(TAG, "findPoseSingleMarker: setLandmarkPoints" + setLandmarkPoints.toString());
+                    Log.i(TAG, "findPoseSingleMarker: known" + basicSlam.knownLandmarkPoints.toString());
+                    if(setCount.get(id) == null) {
+                        setCount.put(id, 1);
+                        setLandmarkPointsCount++;
+                        Log.i(TAG, "findPoseSingleMarker: id" + Integer.toString(id));
+                        Log.i(TAG, "findPoseSingleMarker: setLandmarkPointsCount" + Integer.toString(setLandmarkPointsCount));
+                        Log.i(TAG, "findPoseSingleMarker: setCount" + setCount.toString());
+
+                    }
+                }
+
+                MatOfPoint3f cornerWorldPoints = new MatOfPoint3f();
+                findMarkerCorner(id, length, cornerWorldPoints);
+                Mat rvec = new Mat();
+                Mat tvec = new Mat();
+                Log.i(TAG, "findPoseSingleMarker: corner2d" + corners.get(i).dump());
+                MatOfPoint2f imagepoints = new MatOfPoint2f();
+                Mat ithCorners = corners.get(i);
+                imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 0)[0], ithCorners.get(0, 0)[1])));
+                imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 1)[0], ithCorners.get(0, 1)[1])));
+                imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 2)[0], ithCorners.get(0, 2)[1])));
+                imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 3)[0], ithCorners.get(0, 3)[1])));
+                MatOfDouble distcoeff = new MatOfDouble();
+                mDistortionCoefficients.convertTo(distcoeff, CvType.CV_64F);
+                Calib3d.solvePnP(cornerWorldPoints, imagepoints, mCameraMatrix, distcoeff, rvec, tvec, true,CV_P3P);
+                //Log.i(TAG, "findPoseSingleMarker: cornerworld"+ cornerWorldPoints.dump());
+                Log.i(TAG, "findPoseSingleMarker: rvec" + Integer.toString(i) + rvec.dump());
+                Log.i(TAG, "findPoseSingleMarker: tvec" + Integer.toString(i) + tvec.dump());
+                List<Mat> rvec3c = Arrays.asList(rvec.row(0), rvec.row(1), rvec.row(2));
+                Core.merge(rvec3c, rvec);
+                List<Mat> tvec3c = Arrays.asList(tvec.row(0), tvec.row(1), tvec.row(2));
+                Core.merge(tvec3c, tvec);
+                Log.i(TAG, "findPoseSingleMarker: rvec" + Integer.toString(i) + rvec.dump());
+                rvecs.push_back(rvec);
+                tvecs.push_back(tvec);
+                knownLandmarkCount++;
+
+                //find the distant corner and get tvec, rvec using mix points
+                if (MISMATCH_LANDMARK) {
+                    int maxIdPosition = i;
+                    double maxDistance = 0;
+                    ithCorners = corners.get(i);
+                    for (int j = 0; j < ids.size().height; j++) {
+                        if (i != j) {
+                            Mat jthCorners = corners.get(j);
+                            double xcoordinate1 = (ithCorners.get(0, 0)[0] + ithCorners.get(0, 2)[0]) / 2;
+                            double ycoordinate1 = (ithCorners.get(0, 0)[1] + ithCorners.get(0, 2)[1]) / 2;
+                            double xcoordinate2 = (jthCorners.get(0, 0)[0] + jthCorners.get(0, 2)[0]) / 2;
+                            double ycoordinate2 = (jthCorners.get(0, 0)[1] + jthCorners.get(0, 2)[1]) / 2;
+                            double distance = Math.sqrt((xcoordinate1 - xcoordinate2) * (xcoordinate1 - xcoordinate2) + (ycoordinate1 - ycoordinate2) * (ycoordinate1 - ycoordinate2));
+                            if (distance > maxDistance) {
+                                maxIdPosition = j;
+                                maxDistance = distance;
+                            }
+                        }
+                    }
+                    if (maxIdPosition != i) {
+                        MatOfPoint3f cornerWorldPoints1 = new MatOfPoint3f();
+                        MatOfPoint3f cornerWorldPoints2 = new MatOfPoint3f();
+                        cornerWorldPoints = new MatOfPoint3f();
+                        rvec = new Mat();
+                        tvec = new Mat();
+                        imagepoints = new MatOfPoint2f();
+                        ithCorners = corners.get(i);
+                        int id2 = (int) ids.get(maxIdPosition, 0)[0];
+                        Mat jthCorners = corners.get(maxIdPosition);
+                        findMarkerCorner(id, length, cornerWorldPoints1);
+                        findMarkerCorner(id2, length, cornerWorldPoints2);
+                        if (ithCorners.get(0, 0)[0] < jthCorners.get(0, 1)[0]) {
+                            imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 0)[0], ithCorners.get(0, 0)[1])));
+                            imagepoints.push_back(new MatOfPoint2f(new Point(jthCorners.get(0, 1)[0], jthCorners.get(0, 1)[1])));
+                            imagepoints.push_back(new MatOfPoint2f(new Point(jthCorners.get(0, 2)[0], jthCorners.get(0, 2)[1])));
+                            imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 3)[0], ithCorners.get(0, 3)[1])));
+                            cornerWorldPoints.push_back(cornerWorldPoints1.row(0));
+                            cornerWorldPoints.push_back(cornerWorldPoints2.row(1));
+                            cornerWorldPoints.push_back(cornerWorldPoints2.row(2));
+                            cornerWorldPoints.push_back(cornerWorldPoints1.row(3));
+                        } else {
+                            imagepoints.push_back(new MatOfPoint2f(new Point(jthCorners.get(0, 0)[0], jthCorners.get(0, 0)[1])));
+                            imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 1)[0], ithCorners.get(0, 1)[1])));
+                            imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 2)[0], ithCorners.get(0, 2)[1])));
+                            imagepoints.push_back(new MatOfPoint2f(new Point(jthCorners.get(0, 3)[0], jthCorners.get(0, 3)[1])));
+                            cornerWorldPoints.push_back(cornerWorldPoints2.row(0));
+                            cornerWorldPoints.push_back(cornerWorldPoints1.row(1));
+                            cornerWorldPoints.push_back(cornerWorldPoints1.row(2));
+                            cornerWorldPoints.push_back(cornerWorldPoints2.row(3));
+                        }
+                        Calib3d.solvePnP(cornerWorldPoints, imagepoints, mCameraMatrix, distcoeff, rvec, tvec);
+                        rvec3c = Arrays.asList(rvec.row(0), rvec.row(1), rvec.row(2));
+                        Core.merge(rvec3c, rvec);
+                        tvec3c = Arrays.asList(tvec.row(0), tvec.row(1), tvec.row(2));
+                        Core.merge(tvec3c, tvec);
+                        Log.i(TAG, "findPoseSingleMarker: rvec" + Integer.toString(i) + "," + Integer.toString(maxIdPosition) + rvec.dump());
+                        Log.i(TAG, "findPoseSingleMarker: rvec" + Integer.toString(i) + "," + Integer.toString(maxIdPosition) + rvec.dump());
+                        rvecs.push_back(rvec);
+                        tvecs.push_back(tvec);
+                        knownLandmarkCount++;
+                    }
+                }
+            }
+        }
+        Log.i(TAG, "findPoseSingleMarker: rvecs123" + rvecs.dump());
+        Log.i(TAG, "findPoseSingleMarker: tvecs123" + tvecs.dump());
+        Mat coordinates = findCameraCoordinates(knownLandmarkCount, rvecs, tvecs);
+        TextView coordinatesText = rootView.findViewById(R.id.cameraCoordinatesTextSlam);
+        if (count==9) {
+            String coordText = "(" + df.format(coordinates.get(0, 0)[0]) + "," + df.format(coordinates.get(1, 0)[0]) + "," + df.format(coordinates.get(2, 0)[0]) + "," + df.format(setLandmarkPointsCount) + "," + df.format(x_fixed) + "," + df.format(knownLandmarkCount) + ")";
+            coordinatesText.setText(coordText);
+        }
+        //finding coordinates of the remaining landmarks
+        for (int i = 0; i < ids.size().height; i++) {
+            int id = (int) ids.get(i, 0)[0];
+            if (landmarkPoints.get(id) == null) {
+                // TODO: 28-06-2018 complete this
+                if (coordinates.empty() || mDistortionCoefficients.empty() || rvecs.empty() || corners.get(i).empty() || mCameraMatrix.empty())
+                    break;
+                if(count==9)
+                    findNewMarkerCoordinates(id, coordinates, rvecs.row(0),tvecs.row(0), corners.get(i), mCameraMatrix, mDistortionCoefficients);
+            }
+        }
+    }
+
+    /*public void findPoseSingleMarker(List<Mat> corners, Mat ids, float length, Mat mCameraMatrix, Mat mDistortionCoefficients, Mat rvecs, Mat tvecs) {
+        int knownLandmarkCount = 0;
+
         for (int i = 0; i < ids.size().height; i++) {
             int id = (int) ids.get(i, 0)[0];
             if (landmarkPoints.get(id) != null) { //if known marker found and mismatch is false
@@ -447,6 +629,7 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
                 imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 1)[0], ithCorners.get(0, 1)[1])));
                 imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 2)[0], ithCorners.get(0, 2)[1])));
                 imagepoints.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 3)[0], ithCorners.get(0, 3)[1])));
+                //imagepoints.copyTo(imagepointsTemp);
                 MatOfDouble distcoeff = new MatOfDouble();
                 mDistortionCoefficients.convertTo(distcoeff, CvType.CV_64F);
                 Calib3d.solvePnP(cornerWorldPoints, imagepoints, mCameraMatrix, distcoeff, rvec, tvec);
@@ -533,17 +716,62 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         String coordText = "(" + df.format(coordinates.get(0, 0)[0]) + "," + df.format(coordinates.get(1, 0)[0]) + "," + df.format(coordinates.get(2, 0)[0]) + ")";
         coordinatesText.setText(coordText);
 
+
+
         //finding coordinates of the remaining landmarks
         for (int i = 0; i < ids.size().height; i++) {
             int id = (int) ids.get(i, 0)[0];
             if (landmarkPoints.get(id) == null) {
+                MatOfPoint2f imagepoints1 = new MatOfPoint2f();
+                Mat ithCorners = corners.get(i);
+                imagepoints1.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 0)[0], ithCorners.get(0, 0)[1])));
+                imagepoints1.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 1)[0], ithCorners.get(0, 1)[1])));
+                imagepoints1.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 2)[0], ithCorners.get(0, 2)[1])));
+                imagepoints1.push_back(new MatOfPoint2f(new Point(ithCorners.get(0, 3)[0], ithCorners.get(0, 3)[1])));
+                imagepoints1.copyTo(imagepointsTemp);
+                Log.i(TAG, "Testing3: id" + Integer.toString(id));
+                Log.i(TAG, "Testing3: count" + Integer.toString(count));
                 // TODO: 28-06-2018 complete this
                 if (coordinates.empty() || mDistortionCoefficients.empty() || rvecs.empty() || corners.get(i).empty() || mCameraMatrix.empty())
                     break;
-                findNewMarkerCoordinates(id, coordinates, rvecs.row(0),tvecs.row(0), corners.get(i), mCameraMatrix, mDistortionCoefficients);
+                if(count==3){
+
+                    Mat.zeros(1, 3, CvType.CV_64F).copyTo(rvecs_frame0);
+                    Mat.zeros(1, 3, CvType.CV_64F).copyTo(tvecs_frame0);
+                    /*rvecs_frame0.put(0, 0, rvecs.get(0, 0)[0]);
+                    rvecs_frame0.put(0, 1, rvecs.get(0, 0)[1]);
+                    rvecs_frame0.put(0, 2, rvecs.get(0, 0)[2]);
+                    tvecs_frame0.put(0, 0, tvecs.get(0, 0)[0]);
+                    tvecs_frame0.put(0, 1, tvecs.get(0, 0)[1]);
+                    tvecs_frame0.put(0, 2, tvecs.get(0, 0)[2]);*/
+                    /*2rvecs.copyTo(rvecs_frame0);
+                    tvecs.copyTo(tvecs_frame0);
+                    Log.i(TAG, "Testing: rvecs" + rvecs.dump());
+                    Log.i(TAG, "Testing: tvecs" + tvecs.dump());
+                    Log.i(TAG, "Testing: rvecs" + rvecs_frame0.dump());
+                    Log.i(TAG, "Testing: tvecs" + tvecs_frame0.dump());
+                    imagepointsTemp.copyTo(imagepointsF0);
+                    Log.i(TAG, "Testing: ip" + imagepointsTemp.dump());
+                    Log.i(TAG, "Testing: ip" + imagepointsF0.dump());
+
+                }
+                Log.i(TAG, "Testing2: rvecs"+ Integer.toString(count) +"@@@"+ rvecs.dump());
+                Log.i(TAG, "Testing2: tvecs" +Integer.toString(count) +"@@@"+ tvecs.dump());
+                if(count==69) {
+                    //findNewMarkerCoordinates(id, coordinates, rvecs.row(0), tvecs.row(0), corners.get(i), mCameraMatrix, mDistortionCoefficients);
+                    Log.i(TAG, "findPoseSingleMarker: count" + Integer.toString(count));
+                    Log.i(TAG, "findPoseSingleMarker: tvecs at frame0" + tvecs_frame0.dump());
+                    Log.i(TAG, "findPoseSingleMarker: rvecs at frame0" + rvecs_frame0.dump());
+                    Log.i(TAG, "findPoseSingleMarker: tvecs at frame30" + tvecs.dump());
+                    Log.i(TAG, "findPoseSingleMarker: rvecs at frame30" + rvecs.dump());
+                    if (coordinates.empty() || mDistortionCoefficients.empty() || rvecs.empty() || corners.get(i).empty() || mCameraMatrix.empty()||rvecs_frame0.empty()||tvecs_frame0.empty())
+                        break;
+                    findNewMarkerCoordinates(id, coordinates, rvecs.row(0), tvecs.row(0),rvecs_frame0.row(0),tvecs_frame0.row(0), corners.get(i), mCameraMatrix, mDistortionCoefficients);
+                }
+                count++;
             }
         }
-    }
+    }*/
 
     /**private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c,Mat tvec3c, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
         Mat rvec = new Mat();
@@ -636,10 +864,33 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
         
         Log.i(TAG, "findNewMarkerCoordinates: result" + result.dump());
         float[] landmarkCoord = new float[3];
+        /*landmarkCoord[0] = (float) (result.get(0, 0)[0]/result.get(2, 0)[0]);
+        landmarkCoord[1] = (float) (result.get(1, 0)[0]/result.get(2, 0)[0]);
+        landmarkCoord[2] = z_fixed;*/
+        if(setLandmarkPointsCount==1)
+        {
         landmarkCoord[0] = (float) (result.get(0, 0)[0]/result.get(2, 0)[0]);
         landmarkCoord[1] = (float) (result.get(1, 0)[0]/result.get(2, 0)[0]);
         landmarkCoord[2] = z_fixed;
-
+        landmarkCoord[0]+=(9.1/2);
+        landmarkCoord[1]-=(9.1/2);
+        }
+        if(setLandmarkPointsCount==2)
+        {
+            landmarkCoord[0] = x_fixed;
+            landmarkCoord[1] = (float) (result.get(1, 0)[0]/result.get(2, 0)[0]);
+            landmarkCoord[2] = (float) (result.get(0, 0)[0]/result.get(2, 0)[0]);
+            landmarkCoord[2]+=(9.1/2);
+            landmarkCoord[1]-=(9.1/2);
+        }
+        else
+        {
+            landmarkCoord[0] = (float) (result.get(0, 0)[0]/result.get(2, 0)[0]);
+            landmarkCoord[1] = (float) (result.get(1, 0)[0]/result.get(2, 0)[0]);
+            landmarkCoord[2] = z_fixed;
+            landmarkCoord[0]+=(9.1/2);
+            landmarkCoord[1]-=(9.1/2);
+        }
         double[] a2 = new double[3];
         result.get(0, 0, a2);//I get byte array here for the whole image
         basicSlam.landmarkDump+= "\n"+String.format("%.2f",a2[0])+","+String.format("%.2f",a2[1])+","+String.format("%.2f",a2[2]);
@@ -648,6 +899,164 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
 
         landmarkPoints.put(id, landmarkCoord);
     }
+
+    /*private void findNewMarkerCoordinates(int id, Mat camCoord, Mat rvec3c, Mat tvec3c,Mat rvecf0, Mat tvecf0, Mat corner, Mat mCameraMatrix, Mat mDistortionCoefficients) {
+        Mat Points4D= new Mat();
+        Mat R1 = new Mat();
+        Mat R2 = new Mat();
+        Mat P1 = new Mat();
+        Mat P2 = new Mat();
+        Mat Q= new Mat();
+        Mat temp= new Mat();
+        Mat rvec = new Mat();
+        Mat dist= new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F);
+        Mat result = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(result);
+        Mat rotMatrix1 = new Mat();
+        Mat tempResult = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(temp);
+        Mat.zeros(4, 1, CvType.CV_64F).copyTo(dist);
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(rvec);
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(tempResult);
+        rvec.put(0, 0, rvec3c.get(0, 0)[0]);
+        rvec.put(1, 0, rvec3c.get(0, 0)[1]);
+        rvec.put(2, 0, rvec3c.get(0, 0)[2]);
+        Mat tvec = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(tvec);
+        tvec.put(0, 0, tvec3c.get(0, 0)[0]);
+        tvec.put(1, 0, tvec3c.get(0, 0)[1]);
+        tvec.put(2, 0, tvec3c.get(0, 0)[2]);
+
+        Mat rvecf = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F);
+        Mat rotMatrix2 = new Mat();
+        Mat homoMatrix = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(rvecf);
+
+        rvecf.put(0, 0, rvecf0.get(0, 0)[0]);
+        rvecf.put(1, 0, rvecf0.get(0, 0)[1]);
+        rvecf.put(2, 0, rvecf0.get(0, 0)[2]);
+        Calib3d.Rodrigues(rvecf, rotMatrix1);
+
+        Mat tvecf = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(tvecf);
+        tvecf.put(0, 0, tvecf0.get(0, 0)[0]);
+        tvecf.put(1, 0, tvecf0.get(0, 0)[1]);
+        tvecf.put(2, 0, tvecf0.get(0, 0)[2]);
+
+        Mat rotMatrixRel = new Mat();
+        Mat.zeros(3, 3, CvType.CV_64F).copyTo(rotMatrixRel);
+        Mat transVecRel = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(transVecRel);
+
+        Mat newMarkerPoint = new Mat();
+        Mat.zeros(3, 1, CvType.CV_64F).copyTo(newMarkerPoint);
+        newMarkerPoint.put(0, 0, corner.get(0, 0)[0]);
+        newMarkerPoint.put(1, 0, corner.get(0, 0)[1]);
+        newMarkerPoint.put(2, 0, 1);
+
+        //Camera coordinates can be obtained using 'camera position = - rot_matrix.transpose() * tvec'
+        //Here rotation matrix can be obtained by Rodrigues function
+
+        Log.i(TAG, "findNewMarkerCoordinates: corners" + corner.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: marker 2D point" + Integer.toString(id) + newMarkerPoint.dump());
+        Calib3d.Rodrigues(rvec, rotMatrix2);
+        rotMatrix1.copyTo(homoMatrix);
+        Log.i(TAG, "findNewMarkerCoordinates: rotMatrix1" + rotMatrix1.dump());
+
+        //rotMatrix = rotMatrix.inv();
+       /* rotMatrix1.put(0, 2, tvec3c.get(0, 0)[0]);
+        rotMatrix1.put(1, 2, tvec3c.get(0, 0)[1]);
+        rotMatrix1.put(2, 2, tvec3c.get(0, 0)[2]);*/
+
+        /*2Log.i(TAG, "H matrix1: " + homoMatrix.dump());
+        //zmCameraMatrix = mCameraMatrix.inv();
+        rotMatrix1 = rotMatrix1.inv();
+
+
+        Log.i(TAG, "findNewMarkerCoordinates: rvecs at frame0" + rvecf0.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: rvecs at frame0" + rvecf.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: rvecs at frame30" + rvec3c.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: rvecs at frame30" + rvec.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: tvecs at frame0" + tvecf0.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: tvecs at frame0" + tvecf.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: tvecs at frame30" + tvec3c.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: tvecs at frame30" + tvec.dump());
+        Core.gemm( rotMatrix1,rotMatrix2, 1, newMarkerPoint, 0, rotMatrixRel, 0);
+        Log.i(TAG, "Relative rot matrix: " + rotMatrixRel.dump());
+        Core.gemm( rotMatrixRel,tvecf, -1, tvec, 1, transVecRel, 0);
+
+        Log.i(TAG, "Relative Trans vector: " + transVecRel.dump());
+        /*Log.i(TAG, "Camera matrix: " + mCameraMatrix.dump());
+        Core.gemm( rotMatrix1,mCameraMatrix, 1, newMarkerPoint, 0, rotMatrix1, 0);
+        Log.i(TAG, "findNewMarkerCoordinates: first Mult" + rotMatrix1.dump());
+        Core.gemm(rotMatrix1, newMarkerPoint, 1, camCoord, 0, result, 0);*/
+        //result.put(2, 0,result.get(2, 0)[0]-camCoord.get(2, 0)[0]);
+        //Size mImageSize = new Size(mrgba.width() , mrgba.height());
+        /*3MatOfDouble distcoeff1 = new MatOfDouble();
+        mDistortionCoefficients.convertTo(distcoeff1, CvType.CV_64F);
+        Log.i(TAG, "findNewMarkerCoordinates: Size" + mrgba.size());
+        Log.i(TAG, "findNewMarkerCoordinates: Size" + mOutput.size());
+        Calib3d.stereoRectify(mCameraMatrix,distcoeff1,mCameraMatrix,distcoeff1,mImageSize,rotMatrixRel,transVecRel,R1,R2,P1,P2,Q);
+        MatOfPoint2f iF0 = new MatOfPoint2f();
+        MatOfPoint2f iTemp = new MatOfPoint2f();
+        Log.i(TAG, "mDistortionCoefficients" + mDistortionCoefficients.dump());
+        Log.i(TAG, "distcoeff1" + distcoeff1.dump());
+
+        dist.put(0, 0, distcoeff1.get(0, 0)[0]);
+        dist.put(1, 0, distcoeff1.get(1, 0)[0]);
+        dist.put(2, 0, distcoeff1.get(4, 0)[0]);
+        dist.put(3, 0, 0.0);
+        Log.i(TAG, "dist" + dist.dump());
+
+        /*Calib3d.undistortPoints(imagepointsF0,iF0,mCameraMatrix,dist,R1,P1);
+        Calib3d.undistortPoints(imagepointsTemp,iTemp,mCameraMatrix,dist,R2,P2);
+        Calib3d.triangulatePoints(P1,P2,iF0,iTemp,Points4D);*/
+        /*4Calib3d.triangulatePoints(P1,P2,imagepointsF0,imagepointsTemp,Points4D);
+        /*float[] firstCornerCoord = new float[3];
+        firstCornerCoord[0] = (float) (Points4D.get(0, 0)[0]/Points4D.get(3, 0)[0]);
+        firstCornerCoord[1] = (float) (Points4D.get(1, 0)[0]/Points4D.get(3, 0)[0]);
+        firstCornerCoord[2] = (float) (Points4D.get(2, 0)[0]/Points4D.get(3, 0)[0]);*/
+        /*5Log.i(TAG,"Tem4D"+ Points4D.dump() );
+        temp.put(0,0,(Points4D.get(0, 0)[0]/Points4D.get(3, 0)[0]));
+        temp.put(1,0,(Points4D.get(1, 0)[0]/Points4D.get(3, 0)[0]));
+        temp.put(2,0,(Points4D.get(2, 0)[0]/Points4D.get(3, 0)[0]));
+        Log.i(TAG,"TempResult"+ temp.dump() );
+        //Log.i(TAG, "findNewMarkerCoordinates: result" + result.dump());
+        /*float[] landmarkCoord = new float[3];
+        landmarkCoord[0] = (float) (result.get(0, 0)[0]/result.get(2, 0)[0]);
+        landmarkCoord[1] = (float) (result.get(1, 0)[0]/result.get(2, 0)[0]);
+        landmarkCoord[2] = z_fixed;
+
+        double[] a2 = new double[3];
+        result.get(0, 0, a2);//I get byte array here for the whole image
+        basicSlam.landmarkDump+= "\n"+String.format("%.2f",a2[0])+","+String.format("%.2f",a2[1])+","+String.format("%.2f",a2[2]);*/
+        //basicSlam.landmarkDump+= Float.toString(landmarkCoord[0])+","+Float.toString(landmarkCoord[1])+","+Float.toString(landmarkCoord[2])+"\n";
+        /*6homoMatrix.put(0, 2, tvecf.get(0, 0)[0]);
+        homoMatrix.put(1, 2, tvecf.get(1, 0)[0]);
+        homoMatrix.put(2, 2, tvecf.get(2, 0)[0]);
+        float[] landmarkCoord = new float[3];
+        //Log.i(TAG, "Temp: " + temp.dump());
+        Log.i(TAG, "findNewMarkerCoordinates: homoMatrix2" + homoMatrix.dump());
+        homoMatrix = homoMatrix.inv();
+        Core.gemm(homoMatrix,temp,1,camCoord,0,result);
+        Log.i(TAG, "findNewMarkerCoordinates: result1" + result.dump());
+
+        landmarkCoord[0] = (float) (result.get(0, 0)[0]);
+        landmarkCoord[1] = (float) (result.get(1, 0)[0]);
+        landmarkCoord[2] = (float)(result.get(2, 0)[0]);
+        landmarkCoord[0]+=(9.1/2);
+        landmarkCoord[1]-=(9.1/2);
+        landmarkPoints.put(id, landmarkCoord);
+        /*landmarkCoord[0] = (float) (temp.get(0, 0)[0]);
+        landmarkCoord[1] = (float) (temp.get(1, 0)[0]);
+        landmarkCoord[2] = (float)(temp.get(2, 0)[0]);
+        landmarkCoord[0]+=(9.1/2);
+        landmarkCoord[1]-=(9.1/2);
+        landmarkPoints.put(id, landmarkCoord);*/
+
+    //}
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
@@ -668,7 +1077,10 @@ public class slamCameraTabFragment extends Fragment implements CameraBridgeViewB
                     //Aruco.estimatePoseSingleMarkers(corners, 6.3f, mCameraMatrix, mDistortionCoefficients, rvecs, tvecs);
                     //Log.i(TAG, "findPoseSingleMarker: rvecs real" +rvecs.dump());
                     //Log.i(TAG, "findPoseSingleMarker: tvecs real" +tvecs.dump());
+                    if (count%10==0)
+                        count=0;
                     findPoseSingleMarker(corners, ids, 9.1f, mCameraMatrix, mDistortionCoefficients, rvecs, tvecs);
+                    count++;
                     //Aruco.drawAxis(inputFrame.rgba(), mCameraMatrix, mDistortionCoefficients, rvecs, tvecs, 0.1f);
                     //Mat coordinates = getCameraCoordinates(ids, rvecs, tvecs);
                 }
